@@ -1,7 +1,6 @@
-# Beautiful Efficient Task Scheduler
+# Efficient Task Scheduler
 
 ## Overview
-A visually appealing web-based task scheduler that allows users to input tasks dynamically, showing their execution order with priority-based Gantt bars.
 
 ## Setup
 ```bash
