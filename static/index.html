@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Beautiful Task Scheduler</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body { 
+      font-family: 'Roboto', sans-serif; 
+      margin: 0; 
+      padding: 0; 
+      background: #f4f6f8; 
+    }
+    h1 {
+      text-align: center; 
+      padding: 20px; 
+      color: #2c3e50;
+    }
+    .container {
+      display: flex; 
+      justify-content: space-around; 
+      flex-wrap: wrap;
+      margin: 20px;
+    }
+    form {
+      background: #ffffff; 
+      padding: 25px; 
+      border-radius: 12px; 
+      width: 300px; 
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    }
+    input, button {
+      padding: 10px; 
+      margin: 8px 0; 
+      width: 100%; 
+      border-radius: 6px; 
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
+    button {
+      background: linear-gradient(90deg,#4facfe,#00f2fe);
+      color: white; 
+      font-weight: 500;
+      border: none;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    button:hover {
+      opacity: 0.9;
+      transform: translateY(-2px);
+    }
+    table {
+      border-collapse: collapse; 
+      width: 600px; 
+      background: #fff; 
+      border-radius: 12px; 
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+      overflow: hidden;
+      margin-bottom: 30px;
+    }
+    th, td { 
+      border-bottom: 1px solid #ddd; 
+      padding: 12px; 
+      text-align: center; 
+      font-size: 14px;
+    }
+    th {
+      background: linear-gradient(90deg,#4facfe,#00f2fe);
+      color: #fff;
+    }
+    tr:hover {
+      background: #f1f1f1;
+    }
+    .gantt {
+      width: 90%; 
+      margin: 20px auto;
+    }
+    .task-bar {
+      height: 35px; 
+      margin: 8px 0; 
+      color: white; 
+      text-align: center; 
+      line-height: 35px; 
+      border-radius: 6px; 
+      font-weight: 500;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+      transition: transform 0.2s;
+    }
+    .task-bar:hover {
+      transform: scale(1.02);
+    }
+    .priority-1 { background: #e74c3c; } /* High */
+    .priority-2 { background: #f39c12; } /* Medium */
+    .priority-3 { background: #2ecc71; } /* Low */
+  </style>
+</head>
+<body>
+  <h1>Beautiful Efficient Task Scheduler</h1>
+  <div class="container">
+    <form id="taskForm">
+      <label>Task ID:</label>
+      <input type="text" id="taskId" required>
+      <label>Priority (1=High):</label>
+      <input type="number" id="priority" min="1" max="3" required>
+      <label>Deadline:</label>
+      <input type="number" id="deadline" required>
+      <label>Dependencies (comma-separated IDs):</label>
+      <input type="text" id="dependencies">
+      <button type="submit">Add Task</button>
+    </form>
+
+    <div>
+      <table id="taskTable">
+        <tr><th>Task ID</th><th>Priority</th><th>Deadline</th><th>Dependencies</th></tr>
+      </table>
+      <div class="gantt" id="ganttChart"></div>
+    </div>
+  </div>
+
+  <script>
+    const taskForm = document.getElementById('taskForm');
+    const taskTable = document.getElementById('taskTable');
+    const ganttChart = document.getElementById('ganttChart');
+    let tasks = [];
+
+    taskForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const id = document.getElementById('taskId').value.trim();
+      const priority = parseInt(document.getElementById('priority').value);
+      const deadline = parseInt(document.getElementById('deadline').value);
+      const dependencies = document.getElementById('dependencies').value.split(',')
+                                .map(d => d.trim()).filter(d => d);
+
+      if (tasks.some(t => t.id === id)) {
+        alert("Task ID must be unique!");
+        return;
+      }
+
+      const task = {id, priority, deadline, dependencies, remainingDeps: dependencies.length};
+      tasks.push(task);
+
+      const row = taskTable.insertRow();
+      row.insertCell(0).innerText = id;
+      row.insertCell(1).innerText = priority;
+      row.insertCell(2).innerText = deadline;
+      row.insertCell(3).innerText = dependencies.join(',');
+
+      updateGantt();
+    });
+
+    function scheduleTasks(tasks) {
+      // Clone tasks to avoid modifying original array
+      let taskMap = {};
+      tasks.forEach(t => taskMap[t.id] = {...t, remainingDeps: t.dependencies.length});
+
+      let schedule = [];
+      let ready = Object.values(taskMap).filter(t => t.remainingDeps === 0);
+
+      while (ready.length > 0) {
+        // Sort by priority (low number = high priority) then deadline
+        ready.sort((a,b) => a.priority - b.priority || a.deadline - b.deadline);
+        let task = ready.shift();
+        schedule.push(task);
+
+        // Reduce dependencies for other tasks
+        Object.values(taskMap).forEach(t => {
+          if (t.dependencies.includes(task.id)) {
+            t.remainingDeps -= 1;
+            if (t.remainingDeps === 0) ready.push(t);
+          }
+        });
+      }
+
+      // Check for cycles
+      if (schedule.length !== tasks.length) {
+        alert("Cycle detected in dependencies! Cannot schedule all tasks.");
+        return [];
+      }
+
+      return schedule;
+    }
+
+    function updateGantt() {
+      ganttChart.innerHTML = '';
+      const orderedTasks = scheduleTasks(tasks);
+      orderedTasks.forEach(t => {
+        const div = document.createElement('div');
+        div.className = `task-bar priority-${t.priority}`;
+        div.style.width = `${t.deadline*50}px`; // proportional width
+        div.innerText = `${t.id} (P:${t.priority})`;
+        ganttChart.appendChild(div);
+      });
+    }
+  </script>
+</body>
+</html>
